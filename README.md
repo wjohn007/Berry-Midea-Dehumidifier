@@ -1,118 +1,184 @@
-# 1. Project Midea Dehumidifier
+# Midea Dehumidifier Project
 
-## 1.1 Introduction
-The Midea DF-20DEN7-WF (and the Comfee MDDF-20DEN7) uses the SmartKey dongle to connect to the cloud-based Midea App.
-The Wi-Fi interface is delivered through a dongle named SmartKey that attaches to the Midea controller via USB-A.
-This project describes the hardware build and the software to replace the original SmartKey dongle and to expose the functions over MQTT or HTTP REST API.
-The project is based on [esp8266-midea-dehumidifier](https://github.com/Hypfer/esp8266-midea-dehumidifier), which provides a C++ implementation.
-During the development of this project the [ESPHome-Dehumidifier](https://github.com/Chreece/ESPHome-Dehumidifier) project was created in parallel and offers a similar feature set.
+## 1. Introduction
+
+The **Midea DF-20DEN7-WF** dehumidifier (identical to the **Comfee dehumidifier MDDF-20DEN7**) is normally connected to the cloud-based **Midea App** via a so-called **SmartKey dongle**.
+
+This project follows an alternative approach and enables **cloud-free integration** of the device into **any smarthome system** via **MQTT** or a **REST API**.
+
+The documentation describes both the required **hardware modification** and the **software** necessary to achieve this goal.
+
+**Key aspects of the project:**
+
+* The original SmartKey is replaced by an **ESP32 processor** flashed with **Tasmota** firmware
+* Device control is implemented using the **Berry scripting language**
+
+The C++ project [esp8266-midea-dehumidifier](https://github.com/Hypfer/esp8266-midea-dehumidifier) served as a reference.
+
+In parallel with the development of this project, [ESPHome-Dehumidifier](https://github.com/Chreece/ESPHome-Dehumidifier) was created, offering a similar feature set.
+
+---
 
 ## 2. Fundamentals
+
 ### 2.1 Serial Communication
-The communication between SmartKey and the Midea controller is serial at 9600 baud 8N1 with 5V TTL levels.
 
-| Parameter | Comment |
-| --- | --- |
-| Power | ON/OFF |
-| Mode | setpoint, continous, smart, dryer |
-| Setpoint | 35..85 in steps of 5 % r.h. |
-| Fan Speed | low, medium, high |
-| Temperature | current temperature in °C |
-| Humidity | current relative humidity in % r.h. |
-| Error | current error |
-| Communicating | communication status (if TRUE the communication is OK) |
+Communication between the **SmartKey** and the **Midea controller** is performed via a serial interface with the following parameters:
 
-## 3. Hardware Replacement
-The following hardware components are used:
-- ESP32-S3
-- 4-channel level shifter 3.3/5.0 V
-- cut-off USB-A cable
-- USB-A extension
-- Wago clamps
-- jumper wires
-- double-sided tape
-- enclosure
+* **Baud rate:** 9600
+* **Data format:** 8N1
+* **Signal levels:** 5 V TTL
 
-The ESP32-S3 provides plenty of RAM so that [TasmoView](https://github.com/wjohn007/TasmoView) can be used.
-The 4-channel level shifter adapts the 3.3V signals of the ESP32 to the interface.
-It is glued directly onto the ESP32 to save space.
-The Wago clamps are also glued to the ESP32 and bridge the USB cable to the electronics.
-The USB port of the dehumidifier provides GND,VCC,RX,TX with VCC=5VDC.
-The CPU itself serves as a "motherboard" for the level shifter and the Wago clamps.
+Both control commands and status information are exchanged over this interface.
+The most important supported parameters are summarized in the table below:
+
+| Parameter     | Description                                    |
+| ------------- | ---------------------------------------------- |
+| Power         | On / Off                                       |
+| Mode          | setpoint, continuous, smart, dryer             |
+| Setpoint      | 35 … 85 % r. h. in 5 % steps                   |
+| Fan Speed     | low, medium, high                              |
+| Temperature   | Current temperature in °C                      |
+| Humidity      | Current relative humidity in % r. h.           |
+| Error         | Current error code                             |
+| Communicating | Communication status (TRUE = communication OK) |
+
+---
+
+## 3. SmartKey Hardware Replacement
+
+The following hardware components are used to replace the original SmartKey dongle:
+
+* ESP32-S3
+* 4-channel level shifter (3.3 V ↔ 5.0 V)
+* Cut USB-A cable
+* USB-A extension cable
+* Wago terminals
+* Jumper wires
+* Double-sided adhesive tape
+* Enclosure
+
+The **ESP32-S3** provides sufficient RAM to use additional tools such as
+[TasmoView](https://github.com/wjohn007/TasmoView).
+
+Since the dehumidifier’s serial interface operates with **5 V TTL levels**, a **4-channel level shifter** is used to adapt the **3.3 V signals** of the ESP32. It is mounted directly on the ESP32 in a space-saving and electrically insulated manner.
+
+The **Wago terminals** are also mounted directly on the ESP32 and provide a mechanically stable connection between the cut USB cable and the electronics.
+
+The USB socket of the dehumidifier provides the signals **GND, VCC, RX, and TX**, with **VCC = 5 V DC**.
+The ESP32 therefore acts both as the **control unit** and as a mechanical **“motherboard”** for the level shifter and terminals.
 
 <img src="images/BoardAssem01.png" style="width:30%;" /><br>
-So everything fits into a standard small junction box.
+This allows everything to fit into a standard small junction box.
 
 <img src="images/BoardAssem02.png" style="width:30%;" /><br>
-The electrical schematic of the Tasmota controller with all components
+Electronic schematic of the Tasmota controller with all components.
 
 <img src="images/schema.png" style="width:30%;" /><br>
-The SmartKey is removed, and the USB extension is attached.
+The SmartKey is removed and the USB extension cable is installed.
 
 <img src="images/CasePreparing.png" style="width:30%;" /><br>
-The USB extension is routed out of the case and connected to the Tasmota controller.
+The USB extension is routed out of the housing and connected to the Tasmota controller.
 
 <img src="images/assemblyCompleted.png" style="width:30%;" /><br>
-Completed wiring for the dehumidifier.
+Completed wiring to the dehumidifier.
+
+---
 
 ## 4. Tasmota Firmware
-The standard Tasmota firmware is fully sufficient for the demands of this project.
-- [tasmota32s3 without PSRAM usage](https://ota.tasmota.com/tasmota32/release/tasmota32s3.bin)
 
-If more RAM is needed this firmware can also be used with PSRAM.
-- [tasmota32s3 with PSRAM usage](https://github.com/Jason2866/Tasmota-specials/raw/refs/heads/firmware/firmware/tasmota32/other/tasmota32s3-qio_opi.bin)
+For the requirements of this project, the **standard Tasmota firmware for the ESP32-S3** is fully sufficient.
+
+**Recommended firmware (without PSRAM support):**
+
+* [tasmota32s3 without PSRAM support](https://ota.tasmota.com/tasmota32/release/tasmota32s3.bin)
+
+If additional RAM is required (e.g. for more complex scripts or visualization tools such as TasmoView), a firmware version with **PSRAM support** can be used instead:
+
+**Alternative firmware (with PSRAM support):**
+
+* [tasmota32s3 with PSRAM support](https://github.com/Jason2866/Tasmota-specials/raw/refs/heads/firmware/firmware/tasmota32/other/tasmota32s3-qio_opi.bin)
+
+---
 
 ## 5. Application Software
-The task is implemented with the Berry programming language.
-All source files are packed into the application file dehum.tapp.
 
-What is implemented:
-- Implementation of the native communication protocol with the Midea controller
-- Provision of the new Tasmota commands
-- Integration of the information into the Tasmota sensor message
-- Display of the information in the Web UI
+The application logic is implemented using the **Berry scripting language**.
+The complete source code is bundled in the **application file `dehum.tapp`**.
 
-Extended functional mode (extended Mode):
-- Capture of power consumption via a smart plug (also Tasmota)
-- Derivation of the operating state from the electrical power
-  - Fan ON/OFF
-  - Pump ON/OFF
-- Integration of the information into the Tasmota sensor message
-- Display of the information in the Web UI
-- Display of the information in TasmoView
+### 5.1 Basic Functions
+
+* Implementation of the **native communication protocol** of the Midea controller
+* Provision of **new Tasmota commands**
+* Integration of device information into the **Tasmota sensor message**
+* Display of relevant information in the **Tasmota web UI**
+
+### 5.2 Extended Function Mode (Extended Mode)
+
+* Acquisition of **electrical power consumption** via a **SmartPlug**
+* Derivation of internal operating states:
+
+  * Fan **ON / OFF**
+  * Pump **ON / OFF**
+* Integration of extended information into the **Tasmota sensor message**
+* Display of the information in the **Tasmota web UI**
+* Visualization of the data in **TasmoView**
+
+---
 
 ## 6. Extended Mode System Overview
-The following illustration shows the system layout for extended Mode
-- The smart plug (3) measures the power consumption of the dehumidifier.
-- From this information the following can be derived:
-  - Fan is running when power >= 15W
-  - Pump is running when power >= 100W
+
+The following diagram shows the **system architecture of the Extended Mode**.
+
+* A **SmartPlug (3)** is used to measure the **electrical power consumption** of the dehumidifier.
+* Based on the measured power, the following internal operating states can be **derived indirectly**:
+
+  * **Fan active** if power ≥ **15 W**
+  * **Pump active** if power ≥ **100 W**
 
 <img src="images/ExtendedMode.png" style="width:40%;" /><br>
 
-The communication between the Dehum controller (2) and the smart plug (3) happens via [Udp-Broker](https://github.com/wjohn007/Berry-UdpBroker).
+Communication between the **Dehum Controller (2)** and the **SmartPlug (3)** is performed via the
+[Udp-Broker](https://github.com/wjohn007/Berry-UdpBroker).
 
-## 7. Parameterization
-The user can configure the application parameters with the file ***dehum01.be***.
+---
+
+## 7. Configuration
+
+The application is configured using the file **`dehum01.be`**.
+
+### 7.1 Serial Interface
 
 ```py
-GPIO_RX = 14   # gpio for serial rx-pin
-GPIO_TX = 13   # gpio for serial tx-pin
-
-useExtension = true # if true, use extended mode
-
+GPIO_RX = 14   # GPIO for serial RX pin
+GPIO_TX = 13   # GPIO for serial TX pin
 ```
 
-## 8. Tasmota Commands
-| command | arguments | example |
-| --- | --- | --- |
-| `dhfanSpeed` | `low`, `medium`, `high` | `dhfanspeed medium` |
-| `dhmode` | `setpoint`, `continous`, `smart`, `dryer` | `dhmode setpoint` |
-| `dhpower` | `on`, `off` | `dhpower on` |
-| `dhsetpoint` | `35..85` in steps of 5 | `dhsetpoint 55` |
+### 7.2 Extended Mode
 
-## 9. Sensor message
+```py
+useExtension = true  # true = enable Extended Mode
+```
+
+---
+
+## 8. Tasmota Commands
+
+The application provides additional **Tasmota commands** for controlling the dehumidifier.
+
+| Command      | Arguments                                  | Example             |
+| ------------ | ------------------------------------------ | ------------------- |
+| `dhfanSpeed` | `low`, `medium`, `high`                    | `dhfanSpeed medium` |
+| `dhmode`     | `setpoint`, `continuous`, `smart`, `dryer` | `dhmode setpoint`   |
+| `dhpower`    | `on`, `off`                                | `dhpower on`        |
+| `dhsetpoint` | `35 … 85` in steps of 5                    | `dhsetpoint 55`     |
+
+---
+
+## 9. Sensor Message
+
 ### 9.1 Normal Mode
+
 ```json
 {
   "Time": "2025-12-07T18:34:35",
@@ -132,6 +198,7 @@ useExtension = true # if true, use extended mode
 ```
 
 ### 9.2 Extended Mode
+
 ```json
 {
   "Time": "2026-01-01T16:41:56",
@@ -155,20 +222,34 @@ useExtension = true # if true, use extended mode
 }
 ```
 
-## 10. Tasmota Web-UI
-### 10.1 Default Mode
+---
+
+## 10. Tasmota Web UI
+
+### Default Mode
+
 <img src="images/screen01.png" style="width:30%;" /><br>
 
-### 10.2 Extended Mode
+### Extended Mode
+
 <img src="images/screen02.png" style="width:30%;" /><br>
 
-### 10.3 TasmoView
+### TasmoView
+
 <img src="images/TasmoView01.png" style="width:50%;" /><br>
+
 <p></p>
 <img src="images/TasmoView02.png" style="width:50%;" /><br>
 
+---
+
 ## 11. References
-[esp8266-midea-dehumidifier](https://github.com/Hypfer/esp8266-midea-dehumidifier)
-[ESPHome-Dehumidifier](https://github.com/Chreece/ESPHome-Dehumidifier)
-[TasmoView](https://github.com/wjohn007/TasmoView)
-[Berry-UdpBroker](https://github.com/wjohn007/Berry-UdpBroker)
+
+* [esp8266-midea-dehumidifier](https://github.com/Hypfer/esp8266-midea-dehumidifier)
+* [ESPHome-Dehumidifier](https://github.com/Chreece/ESPHome-Dehumidifier)
+* [TasmoView](https://github.com/wjohn007/TasmoView)
+* [Berry-UdpBroker](https://github.com/wjohn007/Berry-UdpBroker)
+
+---
+
+
