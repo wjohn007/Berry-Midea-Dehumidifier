@@ -236,10 +236,10 @@ The application provides additional **Tasmota commands** for controlling the deh
 
 ### TasmoView
 
-<img src="images/TasmoView01.png" style="width:50%;" /><br>
+<img src="images/tasmoView01.png" style="width:50%;" /><br>
 
 <p></p>
-<img src="images/TasmoView02.png" style="width:50%;" /><br>
+<img src="images/tasmoView02.png" style="width:50%;" /><br>
 
 ---
 
